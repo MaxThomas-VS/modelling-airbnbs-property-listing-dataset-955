@@ -1,0 +1,92 @@
+#%%
+import argument_parser as ap
+from pathlib import Path
+import pandas as pd
+
+def load_tabular_data(filename, filepath):
+    df = pd.read_csv(filepath+filename)
+    return df
+
+class CleanTabularData():
+
+    def drop_rows_with_missing(self, df, columns):
+        df = df.dropna(subset=columns)
+        df.reset_index(drop=True, inplace=True)
+        return df
+    
+    def combine_description_strings(self, df):
+        description = df['Description']
+        description = description.str.replace("\'About this space\', ", "")
+        description = description.str.replace("\'The space\', ", "")
+
+        description = description.str.replace("[\"","")
+        description = description.str.replace("]\"","")
+        description = description.str.replace("[\'","")
+        description = description.str.replace("]\'","")
+
+        description = description.str.replace("\"[","")
+        description = description.str.replace("\"]","")
+        description = description.str.replace("\'[","")
+        description = description.str.replace("\']","")
+
+        description_list = description.str.split()
+
+        for ix in description_list.index:
+            try:
+                description_list[ix].remove(' ')
+            except:
+                pass
+
+            try:
+                description_list[ix] = ' '.join(description_list[ix])
+            except:
+                description_list[ix] = pd.NaT
+
+        df['Description'] = description_list
+
+        return df
+    
+    def drop_columns(self, df, columns):
+        df = df.drop(columns, axis=1)
+        return df
+    
+    def set_default_feature_values(self, df, columns, value):
+        for col in columns:
+            df[col].fillna(value, inplace=True)
+        return df
+
+
+def clean_tabular_data(df):
+    cleaner = CleanTabularData()
+    df = cleaner.drop_columns(df, ['Unnamed: 19'])
+    df = cleaner.drop_rows_with_missing(df, ['Accuracy_rating', 'Check-in_rating', 'Value_rating', 'Location_rating'])
+    df = cleaner.combine_description_strings(df)
+    df = cleaner.drop_rows_with_missing(df, ['Description'])
+    df = cleaner.set_default_feature_values(df, ['guests','beds','bathrooms','bedrooms'], 1)
+    return df
+
+def extract_label(df, column):
+    label = df[column]
+    df = df.drop(column, axis=1)
+    return df, label
+    
+
+if __name__ == '__main__':
+    arguments = ap.make_args()
+    print(arguments)
+
+    df = load_tabular_data(arguments['file_name'], arguments['import_path'])
+
+    df = clean_tabular_data(df)
+
+    print(df.head())
+    print(df.info())
+
+    Path(arguments['export_path']).mkdir(parents=True, exist_ok=True)
+
+    df.to_csv(arguments['export_path'] + arguments['file_name'], index=False)
+
+    # make d
+
+
+# %%
