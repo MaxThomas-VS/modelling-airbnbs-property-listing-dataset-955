@@ -3,9 +3,6 @@ import argument_parser as ap
 from pathlib import Path
 import pandas as pd
 
-def load_tabular_data(filename, filepath):
-    df = pd.read_csv(filepath+filename)
-    return df
 
 class CleanTabularData():
 
@@ -56,28 +53,46 @@ class CleanTabularData():
         return df
 
 
-def clean_tabular_data(df):
-    cleaner = CleanTabularData()
-    df = cleaner.drop_columns(df, ['Unnamed: 19'])
-    df = cleaner.drop_rows_with_missing(df, ['Accuracy_rating', 'Check-in_rating', 'Value_rating', 'Location_rating'])
-    df = cleaner.combine_description_strings(df)
-    df = cleaner.drop_rows_with_missing(df, ['Description'])
-    df = cleaner.set_default_feature_values(df, ['guests','beds','bathrooms','bedrooms'], 1)
-    return df
+    def clean_tabular_data(self, df):
+        cleaner = CleanTabularData()
+        df = self.drop_columns(df, ['Unnamed: 19'])
+        df = self.drop_rows_with_missing(df, ['Accuracy_rating', 'Check-in_rating', 'Value_rating', 'Location_rating'])
+        df = self.combine_description_strings(df)
+        df = self.drop_rows_with_missing(df, ['Description'])
+        df = self.set_default_feature_values(df, ['guests','beds','bathrooms','bedrooms'], 1)
+        return df
 
-def extract_label(df, column):
-    label = df[column]
-    df = df.drop(column, axis=1)
-    return df, label
-    
+
+class ModelData():
+
+    def load_tabular_data(self, filename, filepath):
+        df = pd.read_csv(filepath+filename)
+        return df
+
+    def is_numeric(self, df):
+        isnumeric = []
+        for column in df.columns:
+            if df[column].dtype.kind in 'biufc':
+                isnumeric.append(column)
+        return isnumeric
+
+    def extract_label(df, column, numeric_only=True):
+        label = df[column]
+        isnumeric = self.is_numeric(df)
+        df = df.drop(isnumeric.append(column), axis=1)
+        return df, label
+        
 
 if __name__ == '__main__':
     arguments = ap.make_args()
     print(arguments)
 
-    df = load_tabular_data(arguments['file_name'], arguments['import_path'])
+    model_data = ModelData()
+    cleaner = CleanTabularData()
 
-    df = clean_tabular_data(df)
+    df = model_data.load_tabular_data(arguments['file_name'], arguments['import_path'])
+
+    df = cleaner.clean_tabular_data(df)
 
     print(df.head())
     print(df.info())
