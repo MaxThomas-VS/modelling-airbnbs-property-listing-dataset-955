@@ -51,6 +51,11 @@ class CleanTabularData():
         for col in columns:
             df[col].fillna(value, inplace=True)
         return df
+    
+    def make_numeric(self, df, columns):
+        for col in columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        return df
 
 
     def clean_tabular_data(self, df):
@@ -60,6 +65,7 @@ class CleanTabularData():
         df = self.combine_description_strings(df)
         df = self.drop_rows_with_missing(df, ['Description'])
         df = self.set_default_feature_values(df, ['guests','beds','bathrooms','bedrooms'], 1)
+        df = self.make_numeric(df, ['bedrooms'])
         return df
 
 
@@ -76,10 +82,22 @@ class ModelData():
                 isnumeric.append(column)
         return isnumeric
 
-    def extract_label(df, column, numeric_only=True):
+    def not_numeric(self, df):
+        isntnumeric = []
+        for column in df.columns:
+            if not df[column].dtype.kind in 'biufc':
+                isntnumeric.append(column)
+        return isntnumeric
+
+    def extract_label(self, df, column, numeric_only=True):
         label = df[column]
-        isnumeric = self.is_numeric(df)
-        df = df.drop(isnumeric.append(column), axis=1)
+        if numeric_only:
+            isnt_numeric = self.not_numeric(df)
+            isnt_numeric.append(column)
+            columns_to_drop = isnt_numeric
+        else:
+            columns_to_drop = label
+        df = df.drop(columns_to_drop, axis=1)
         return df, label
         
 
