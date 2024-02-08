@@ -13,10 +13,16 @@ import torch
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-
+from joblib import dump
+from pathlib import Path
 
 rstate=100
 pre_scale=True
+
+def save_model(model_choice, export_path='../models/', model_type='regression', model_name='SGDregression'):
+    model_name = model_name + '.joblib'
+    model_path = Path(export_path, model_type, model_name)
+    joblib.dump(model_choice, model_path)
 
 
 
@@ -42,10 +48,11 @@ X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.3, r
 
 #%%
 #reg_mdl = SGDRegressor(max_iter=10000, tol=0.0001, alpha=0.1, learning_rate='constant', eta0=1e-7)
-reg = make_pipeline(SGDRegressor())
+reg = make_pipeline(StandardScaler(), SGDRegressor(random_state=rstate))
 reg.fit(X_train, y_train)
 print(mean_squared_error(y_val, reg.predict(X_val), squared=False))
-
+baseline_sgd = (reg, reg.get_params(), mean_squared_error(y_val, reg.predict(X_val), squared=False))
+save_model(baseline_sgd, model_name='baseline_sgd')
 
 #%%
 def random_parameter_search(model_class, X_train, y_train, X_val, y_val, X_test, y_test, parameters, pre_scale = False):
@@ -160,8 +167,8 @@ def grid_search(model_class, parmaeters, X_train, y_train, pre_scale=True, rando
 
     return search.best_estimator_, search.best_params_, search.best_score_
 
-reg, params, performance = grid_search(SGDRegressor, param_grid, X_train, y_train, pre_scale=pre_scale)
-y_val_pred = reg.predict(X_val)
+model_choice = grid_search(SGDRegressor, param_grid, X_train, y_train, pre_scale=pre_scale)
+y_val_pred = model_choice[0].predict(X_val)
 plt.scatter(y_val, y_val_pred, color='black', marker='x')
 
 #%%
