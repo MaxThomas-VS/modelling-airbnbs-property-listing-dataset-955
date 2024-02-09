@@ -63,9 +63,9 @@ class CleanTabularData():
         df = self.drop_columns(df, ['Unnamed: 19'])
         df = self.drop_rows_with_missing(df, ['Accuracy_rating', 'Check-in_rating', 'Value_rating', 'Location_rating'])
         df = self.combine_description_strings(df)
-        df = self.drop_rows_with_missing(df, ['Description'])
         df = self.set_default_feature_values(df, ['guests','beds','bathrooms','bedrooms'], 1)
         df = self.make_numeric(df, ['bedrooms'])
+        df = self.drop_rows_with_missing(df, df.columns)
         return df
 
 
@@ -119,6 +119,7 @@ if __name__ == '__main__':
 
     df.to_csv(arguments['export_path'] + arguments['file_name'], index=False)
 
+    df.info()
     # make d
 
 
