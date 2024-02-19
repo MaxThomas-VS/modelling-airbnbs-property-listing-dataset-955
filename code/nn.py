@@ -11,6 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 import yaml
 import random
 import os
+import datetime
 
 from tabular_data import ModelData
 
@@ -50,7 +51,7 @@ class AirBNBDataset(Dataset):
         return len(self.y)
     
 
-def train(model, config, epochs=10, random_seed=1):
+def train(model, config, train_loader, val_loader, epochs=10, random_seed=1):
 
     if config['optimiser'] == 'SGD':
         optimiser = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'])
@@ -59,9 +60,6 @@ def train(model, config, epochs=10, random_seed=1):
 
     writer = SummaryWriter()
 
-    val_features, val_labels = next(iter(val_loader)) # val data in one batch, grab all
-
-    batch_idx = 0
     tl = []
     vl = []
     for epoch in range(epochs):
@@ -91,9 +89,6 @@ def train(model, config, epochs=10, random_seed=1):
             #writer.add_scalar('Train loss', loss.item(), batch_idx) \
             train_loss.append(np.sqrt(loss.item()))
         train_loss = np.mean(train_loss)
-
-        
-
 
         tl.append(train_loss )
         vl.append(val_loss)
@@ -180,6 +175,8 @@ def plot_training_curve(train_loss, val_loss, title, show=False):
     plt.legend()
     plot_title = title + ' training curve'
     plt.title(plot_title)
+    plt.ylabel('RMSE')
+    plt.xlabel('Epoch')
     if show:
         plt.show()
     return fig
@@ -198,9 +195,7 @@ def plot_validation_scatter(model, X_test, y_test, config_ext, test_loss, show=F
         plt.show()
     return fig
 
-def get_test_loss(model, X_test, y_test):
-    test_data = AirBNBDataset(X_test, y_test)
-    test_loader = DataLoader(test_data, batch_size=len(test_data))
+def get_test_loss(model, test_loader, X_test, y_test):
     test_loss = []
     for batch in test_loader:
             features, labels = batch
@@ -209,12 +204,19 @@ def get_test_loss(model, X_test, y_test):
             test_loss.append(np.sqrt(loss.item()))
     return np.mean(test_loss)
 
-#%%
-if __name__ == '__main__':
-    arguments = ap.make_args()
+def datetime_dir_name(arguments=None):
+    if not arguments:
+        now = datetime.datetime.now()
+    else:
+        now = arguments['run_time']
+    return now.strftime('%Y-%m-%d_%H-%M-%S') + '/'
+
+def train_various_configurations(arguments):
+    savedir = datetime_dir_name(arguments)
     
     n_configs = arguments['nn_n_configs']
     epochs = arguments['nn_epochs']
+    batch_size = arguments['batch_size']
     
 
     X_train, X_val, X_test, y_train, y_val, y_test = data_for_nn()
@@ -223,13 +225,12 @@ if __name__ == '__main__':
     val_data = AirBNBDataset(X_val, y_val)
     test_data = AirBNBDataset(X_test, y_test)
 
-    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=batch_size)
+    test_loader = DataLoader(test_data, batch_size=batch_size)
 
-    val_loader = DataLoader(val_data, batch_size=64)
-    test_loader = DataLoader(test_data, batch_size=64)
 
-
-    configs = generate_nn_configs(n_configs)
+    generate_nn_configs(n_configs)
     best_model = None
     best_loss = np.inf
     for iconfig in range(n_configs):
@@ -242,17 +243,22 @@ if __name__ == '__main__':
 
         model = NN()
 
-        test_loss_original = int(np.round(get_test_loss(model, X_test, y_test), 0))
+        test_loss_original = int(np.round(get_test_loss(model, test_loader, X_test, y_test), 0))
 
         try:
             print('Original test loss: ' + str(test_loss_original))
         except:
             print('Original test loss: ' + 'N/A')
 
-        tl, vl = train(model, config, epochs=epochs, random_seed=arguments['random_state'])
+        tl, vl = train(model=model, 
+                       train_loader=train_loader, 
+                       val_loader=val_loader, 
+                       config=config, 
+                       epochs=epochs, 
+                       random_seed=arguments['random_state'])
 
         try:
-            test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0)) 
+            test_loss_trained = int(round(get_test_loss(model, test_loader, X_test, y_test), 0)) 
             print('Trained test loss: ' + str(test_loss_trained))
         except:
             print('Trained test loss: ' + 'N/A')
@@ -265,7 +271,7 @@ if __name__ == '__main__':
             best_model = iconfig
 
         # %%
-        results_dir = '../models/nn/' + config_ext + '/'
+        results_dir = '../models/nn/' + savedir + config_ext + '/'
         os.system('mkdir -p ' + results_dir)
         torch.save(model.state_dict(), results_dir + 'nn.pt')
         save_str = 'cp nn_configs/nn_config_'+config_ext+'.yaml ' + results_dir
@@ -276,6 +282,15 @@ if __name__ == '__main__':
         print('================ Done ================')
     print('Best model index: ' + str(best_model) + ' with test loss: ' + str(best_loss))
 
+
+#%%
+if __name__ == '__main__':
+    
+    arguments = ap.make_args()
+
+    train_various_configurations(arguments)
+
+    
     #example = next(iter(train_loader))
     #print(example)
     #features, labels = example
