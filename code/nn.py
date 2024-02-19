@@ -1,4 +1,5 @@
 #%%
+import argument_parser as ap
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
@@ -49,7 +50,7 @@ class AirBNBDataset(Dataset):
         return len(self.y)
     
 
-def train(model, config, epochs=10):
+def train(model, config, epochs=10, random_seed=1):
 
     if config['optimiser'] == 'SGD':
         optimiser = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'])
@@ -68,6 +69,7 @@ def train(model, config, epochs=10):
         train_loss = []
         val_loss = []
 
+        torch.manual_seed(random_seed)
         for batch in val_loader:
             features, labels = batch
             predictions = model(features)
@@ -208,113 +210,118 @@ def get_test_loss(model, X_test, y_test):
     return np.mean(test_loss)
 
 #%%
+if __name__ == '__main__':
+    arguments = ap.make_args()
     
-n_configs = 32
-epochs = 50
-
-X_train, X_val, X_test, y_train, y_val, y_test = data_for_nn()
+    n_configs = arguments['nn_n_configs']
+    epochs = arguments['nn_epochs']
     
-train_data = AirBNBDataset(X_train, y_train)
-val_data = AirBNBDataset(X_val, y_val)
-test_data = AirBNBDataset(X_test, y_test)
 
-train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_data, batch_size=64)
-test_loader = DataLoader(test_data, batch_size=64)
+    X_train, X_val, X_test, y_train, y_val, y_test = data_for_nn()
+        
+    train_data = AirBNBDataset(X_train, y_train)
+    val_data = AirBNBDataset(X_val, y_val)
+    test_data = AirBNBDataset(X_test, y_test)
+
+    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+
+    val_loader = DataLoader(val_data, batch_size=64)
+    test_loader = DataLoader(test_data, batch_size=64)
 
 
-configs = generate_nn_configs(n_configs)
-best_model = None
-best_loss = np.inf
-for iconfig in range(n_configs):
+    configs = generate_nn_configs(n_configs)
+    best_model = None
+    best_loss = np.inf
+    for iconfig in range(n_configs):
 
-    print('Training model ' + str(1 + iconfig) + ' of ' + str(n_configs) + ' (index ' + str(iconfig) + ')')
-    
-    config_ext = str(iconfig)
-    
-    config = get_nn_config('nn_config_' + config_ext + '.yaml')
+        print('Training model ' + str(1 + iconfig) + ' of ' + str(n_configs) + ' (index ' + str(iconfig) + ')')
+        
+        config_ext = str(iconfig)
+        
+        config = get_nn_config('nn_config_' + config_ext + '.yaml')
 
-    model = NN()
+        model = NN()
 
-    test_loss_original = int(np.round(get_test_loss(model, X_test, y_test), 0))
+        test_loss_original = int(np.round(get_test_loss(model, X_test, y_test), 0))
 
-    try:
-        print('Original test loss: ' + str(test_loss_original))
-    except:
-        print('Original test loss: ' + 'N/A')
+        try:
+            print('Original test loss: ' + str(test_loss_original))
+        except:
+            print('Original test loss: ' + 'N/A')
 
-    tl, vl = train(model, config, epochs=epochs)
+        tl, vl = train(model, config, epochs=epochs, random_seed=arguments['random_state'])
 
-    try:
-        test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0)) 
-        print('Trained test loss: ' + str(test_loss_trained))
-    except:
-        print('Trained test loss: ' + 'N/A')
+        try:
+            test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0)) 
+            print('Trained test loss: ' + str(test_loss_trained))
+        except:
+            print('Trained test loss: ' + 'N/A')
 
-    f_train = plot_training_curve(tl, vl, config_ext)
-    f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss_trained)
+        f_train = plot_training_curve(tl, vl, config_ext)
+        f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss_trained)
 
-    if test_loss_trained < best_loss:
-        best_loss = test_loss_trained
-        best_model = iconfig
+        if test_loss_trained < best_loss:
+            best_loss = test_loss_trained
+            best_model = iconfig
+
+        # %%
+        results_dir = '../models/nn/' + config_ext + '/'
+        os.system('mkdir -p ' + results_dir)
+        torch.save(model.state_dict(), results_dir + 'nn.pt')
+        save_str = 'cp nn_configs/nn_config_'+config_ext+'.yaml ' + results_dir
+        os.system(save_str)
+        f_train.savefig(results_dir + 'training_curve.png')
+        f_val.savefig(results_dir + 'validation_scatter.png')
+
+        print('================ Done ================')
+    print('Best model index: ' + str(best_model) + ' with test loss: ' + str(best_loss))
+
+    #example = next(iter(train_loader))
+    #print(example)
+    #features, labels = example
+    #features = features.type(torch.float32)
+    ##features = features.reshape(batch_size, -1)
+    #%%
+    #config_ext = 'base'
+    #config = get_nn_config('nn_config_' + config_ext + '.yaml')
+    #model = NN()
+    #get_test_loss(model, X_test, y_test)
+
+    #model = LinearRegression()
+    #model(features)
+    #test_data = AirBNBDataset(X_test, y_test)
+    #test_loader = DataLoader(test_data, batch_size=len(test_data))
+    #for batch in test_loader:
+    #        features, labels = batch
+    #        predictions = model(features)
+    #        loss = F.mse_loss(predictions, labels)
+    #        print(np.sqrt(loss.item()))
+    #%%
+
+    #tl, vl = train(model, config, epochs=50)
+
+    #%%
+
+
+    #%%
+    #test_loss = int(round(get_test_loss(model, X_test, y_test), 0))
+
+    #f_train = plot_training_curve(tl, vl, config_ext)
+    #f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss)
 
     # %%
-    results_dir = '../models/nn/' + config_ext + '/'
-    os.system('mkdir -p ' + results_dir)
-    torch.save(model.state_dict(), results_dir + 'nn.pt')
-    save_str = 'cp nn_configs/nn_config_'+config_ext+'.yaml ' + results_dir
-    os.system(save_str)
-    f_train.savefig(results_dir + 'training_curve.png')
-    f_val.savefig(results_dir + 'validation_scatter.png')
+    ##torch.save(model.state_dict(), results_dir + 'nn.pt')
+    #os.system('mkdir -p ' + results_dir)
+    #save_str = 'cp nn_configs/nn_config_'+config_ext+'.yaml ' + results_dir
+    ####results_dir = '../models/nn/' + config_ext + '/'
+    #os.system(save_str)
+    #f_val.savefig(results_dir + 'validation_scatter.png')
+    ##f_train.savefig(results_dir + 'training_curve.png')
 
-    print('================ Done ================')
+    # %%
+    #state_dict = torch.load('test_model.pt')
+    #new_model = NN()
+    #new_model.load_state_dict(state_dict)
+    #train(new_model, epochs=10)
 
-#example = next(iter(train_loader))
-#print(example)
-#features, labels = example
-#features = features.type(torch.float32)
-##features = features.reshape(batch_size, -1)
-#%%
-#config_ext = 'base'
-#config = get_nn_config('nn_config_' + config_ext + '.yaml')
-#model = NN()
-#get_test_loss(model, X_test, y_test)
-
-#model = LinearRegression()
-#model(features)
-#test_data = AirBNBDataset(X_test, y_test)
-#test_loader = DataLoader(test_data, batch_size=len(test_data))
-#for batch in test_loader:
-#        features, labels = batch
-#        predictions = model(features)
-#        loss = F.mse_loss(predictions, labels)
-#        print(np.sqrt(loss.item()))
-#%%
-
-#tl, vl = train(model, config, epochs=50)
-
-#%%
-
-
-#%%
-#test_loss = int(round(get_test_loss(model, X_test, y_test), 0))
-
-#f_train = plot_training_curve(tl, vl, config_ext)
-#f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss)
-
-# %%
-##torch.save(model.state_dict(), results_dir + 'nn.pt')
-#os.system('mkdir -p ' + results_dir)
-#save_str = 'cp nn_configs/nn_config_'+config_ext+'.yaml ' + results_dir
-####results_dir = '../models/nn/' + config_ext + '/'
-#os.system(save_str)
-#f_val.savefig(results_dir + 'validation_scatter.png')
-##f_train.savefig(results_dir + 'training_curve.png')
-
-# %%
-#state_dict = torch.load('test_model.pt')
-#new_model = NN()
-#new_model.load_state_dict(state_dict)
-#train(new_model, epochs=10)
-
-# %%
+    # %%
