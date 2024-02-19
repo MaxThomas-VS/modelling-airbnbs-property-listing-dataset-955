@@ -224,9 +224,11 @@ test_loader = DataLoader(test_data, batch_size=64)
 
 
 configs = generate_nn_configs(n_configs)
+best_model = None
+best_loss = np.inf
 for iconfig in range(n_configs):
 
-    print('Training model ' + str(1 + iconfig) + ' of ' + str(n_configs))
+    print('Training model ' + str(1 + iconfig) + ' of ' + str(n_configs) + ' (index ' + str(iconfig) + ')')
     
     config_ext = str(iconfig)
     
@@ -243,14 +245,18 @@ for iconfig in range(n_configs):
 
     tl, vl = train(model, config, epochs=epochs)
 
-    test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0))
     try:
+        test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0)) 
         print('Trained test loss: ' + str(test_loss_trained))
     except:
         print('Trained test loss: ' + 'N/A')
 
     f_train = plot_training_curve(tl, vl, config_ext)
     f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss_trained)
+
+    if test_loss_trained < best_loss:
+        best_loss = test_loss_trained
+        best_model = iconfig
 
     # %%
     results_dir = '../models/nn/' + config_ext + '/'
