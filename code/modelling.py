@@ -39,7 +39,26 @@ def quality_control_figure(y_test, X_test, best_params, args):
     plt.title(args['ml_model'])
     plt.savefig(Path(args['export_path'], args['ml_model']+'.png'))
 
-def grid_search(model_class, X_train, y_train, param_grid):
+def tune_regression_hyperparameters(model_class, X_train, y_train, param_grid):
+
+    mse = make_scorer(mean_squared_error, greater_is_better=False)
+
+    pipe = make_pipeline(StandardScaler(), model_class())
+
+    #search = GridSearchCV(pipe, param_grid, scoring=mse)
+    search = GridSearchCV(pipe, param_grid, scoring='neg_root_mean_squared_error', n_jobs=-1)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ConvergenceWarning)
+        search.fit(X_train, y_train)
+
+    search_results = {'best_estimator': search.best_estimator_,
+                      'best_params': search.best_params_,
+                      'validation_RMSE': -search.best_score_}
+
+    return search_results
+
+def tune_classification_hyperparameters(model_class, X_train, y_train, param_grid):
 
     mse = make_scorer(mean_squared_error, greater_is_better=False)
 
@@ -191,7 +210,7 @@ def tune_one_model(args, X_train, y_train):
     # get best hyperparameters
     # TODO: parameters should be passed as namelist rather tham function
     parameters = make_parameter_grid(args['ml_model'])  
-    best_params = grid_search(model_class, X_train, y_train, parameters)
+    best_params = tune_regression_hyperparameters(model_class, X_train, y_train, parameters)
 
     save_model(best_params, args, 'tuned_')
     #print("tuned RMSE (validation): %0.3f" % best_params['validation_RMSE'])
