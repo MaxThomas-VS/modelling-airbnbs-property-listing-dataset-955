@@ -158,9 +158,9 @@ def generate_nn_config_range(filename='nn_configs/config_ranges.yaml'):
     
      
 
-def generate_nn_configs(ranges='./nn_configs/config_ranges.yaml', export_path='./nn_configs/'):
+def generate_nn_configs(n_configs, ranges='./nn_configs/config_ranges.yaml', export_path='./nn_configs/'):
     config_ranges = generate_nn_config_range(ranges)
-    for ix in range(16):
+    for ix in range(n_configs):
         config = {}
         for key in config_ranges.keys():
             try:
@@ -209,7 +209,7 @@ def get_test_loss(model, X_test, y_test):
 
 #%%
     
-n_configs = 4
+n_configs = 32
 epochs = 50
 
 X_train, X_val, X_test, y_train, y_val, y_test = data_for_nn()
@@ -223,7 +223,7 @@ val_loader = DataLoader(val_data, batch_size=64)
 test_loader = DataLoader(test_data, batch_size=64)
 
 
-configs = generate_nn_configs()
+configs = generate_nn_configs(n_configs)
 for iconfig in range(n_configs):
 
     print('Training model ' + str(1 + iconfig) + ' of ' + str(n_configs))
@@ -236,12 +236,18 @@ for iconfig in range(n_configs):
 
     test_loss_original = int(np.round(get_test_loss(model, X_test, y_test), 0))
 
-    print('Original test loss: ' + str(test_loss_original))
+    try:
+        print('Original test loss: ' + str(test_loss_original))
+    except:
+        print('Original test loss: ' + 'N/A')
 
     tl, vl = train(model, config, epochs=epochs)
 
     test_loss_trained = int(round(get_test_loss(model, X_test, y_test), 0))
-    print('Trained test loss: ' + str(test_loss_trained))
+    try:
+        print('Trained test loss: ' + str(test_loss_trained))
+    except:
+        print('Trained test loss: ' + 'N/A')
 
     f_train = plot_training_curve(tl, vl, config_ext)
     f_val = plot_validation_scatter(model, X_test, y_test, config_ext, test_loss_trained)
