@@ -2,6 +2,9 @@
 eval "$(conda shell.bash hook)"
 conda activate aicore_mdl
 
+echo "Cleaning tabular data"
+python tabular_data.py --import_path=../data/raw/airbnb-property-listings/tabular_data/ --export_path=../data/intermediate/airbnb-property-listings/tabular_data/
+
 ./run_regressors
 
 ./run_classifiers
