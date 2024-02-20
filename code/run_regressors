@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo "Train regression models."
+python -W ignore modelling.py --do_train=True --ml_model=sgdregressor,decisiontreeregressor,randomforestregressor,gradientboostingregressor,svr,kernelridge,baeysianridge
+
+echo "Evaluate regression models."
+python -W ignore modelling.py --do_train=False --do_evaluation=True --ml_model=sgdregressor,decisiontreeregressor,randomforestregressor,gradientboostingregressor,svr,kernelridge,bayesianridge
+
+

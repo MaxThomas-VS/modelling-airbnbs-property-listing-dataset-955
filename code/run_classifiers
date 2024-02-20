@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo "Train classification models."
+python -W ignore modelling.py --do_train=True --label=Category --ml_model=logisticregression,decisiontreeclassifier,randomforestclassifier,gradientboostingclassifier
+
+echo "Evaluate classification models."
+python -W ignore modelling.py --do_train=False --label=Category --do_evaluation=True --ml_model=logisticregression,decisiontreeclassifier,randomforestclassifier,gradientboostingclassifier
+
+echo "Train classification models, alternate case."
+python -W ignore modelling.py --do_train=True --label=Category --label=bedrooms --ml_model=logisticregression,decisiontreeclassifier,randomforestclassifier,gradientboostingclassifier
+
+echo "Evaluate classification models."
+python -W ignore modelling.py --do_train=False --label=Category --label=bedrooms --do_evaluation=True --ml_model=logisticregression,decisiontreeclassifier,randomforestclassifier,gradientboostingclassifier

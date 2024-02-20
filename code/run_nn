@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "Train and evaluate neural network."
+python -W ignore modelling.py --do_train=True --ml_model=nn --nn_n_configs=128
+
+echo "Train and evaluate neural network, alternate case."
+python -W ignore modelling.py --do_train=True --ml_model=nn --label=bedrooms --nn_n_configs=128
+
