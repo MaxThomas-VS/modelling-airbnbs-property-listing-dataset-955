@@ -2,6 +2,10 @@
 import argument_parser as ap
 from pathlib import Path
 import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
 
 
 class CleanTabularData():
@@ -99,6 +103,63 @@ class ModelData():
             columns_to_drop = label
         df = df.drop(columns_to_drop, axis=1)
         return df, label
+    
+def get_tabular_data(args, test_size=0.3, rstate=None, column_overide=None, one_hot_encode_labels=False):
+    '''
+    Load tabular data and split it into training and testing sets.
+    
+    Arguments:
+    args: a dictionary containing the file name, import path, label, random state and ml model
+    test_size: the proportion of the data to be used for testing
+    rstate: the random state
+    column_overide: the column to be used as the label. If None, Price_Night is the label
+    one_hot_encode_labels: whether to one hot encode the labels
+    
+    Returns:
+    X_train: the training data
+    X_test: the testing data
+    y_train: the training labels
+    y_test: the testing labels
+    '''
+    if rstate is None:
+        rstate = args['random_state']
+
+    column = args['label']
+
+    if column_overide is not None:
+        column = column_overide
+
+    model_data = ModelData()
+
+    df = model_data.load_tabular_data(args['file_name'], args['import_path'])
+
+    to_model = model_data.extract_label(df, column, numeric_only=True)
+
+    X_train, X_test, y_train, y_test = train_test_split(to_model[0], to_model[1], test_size=test_size, random_state=rstate)
+
+    if one_hot_encode_labels:
+        y_train = one_hot_encode_column(y_train)
+        y_test = one_hot_encode_column(y_test)
+
+    return X_train, X_test, y_train, y_test
+
+def one_hot_encode_column(pds):
+    '''
+    One hot encode a pandas series.
+
+    Arguments:
+    pds: a pandas series to encode
+
+    Returns:
+    oh_labels: the one hot encoded labels as integers
+    '''
+    #oh_encoder = OneHotEncoder(sparse_output=False, drop='first')
+    oh_encoder = OneHotEncoder(sparse_output=False)
+    label_encoder = LabelEncoder()
+    pds_2 = label_encoder.fit_transform(pds).reshape(-1,1)
+    oh_encoder.fit(pds_2)
+    oh_labels = oh_encoder.transform(pds_2)
+    return np.argmax(oh_labels, axis=1)
         
 
 if __name__ == '__main__':

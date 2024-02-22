@@ -19,16 +19,18 @@ import os
 
 
 from tabular_data import ModelData
+from tabular_data import get_tabular_data
 import torch
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import joblib
+import datetime
 
 import scikitplot as skplt
 
-from nn import train_various_configurations
+from nn_train_eval import train_and_evaluate_nn
 
 
 def results_dir(args):
@@ -49,10 +51,13 @@ def dummy_args():
             'random_state': 42, 
             'nn_n_configs': 16, 
             'nn_epochs': 50, 
+            'nn_single_config': None,
             'batch_size': 64, 
+            'nn_val_split_size': 0.2,
             'do_training': True, 
             'do_evaluation': True, 
-            'script': 'modelling.py'}
+            'script': 'modelling.py',
+            'run_time': datetime.datetime.now()}
 
 def save_model(best_params, args, extra_title='baseline_'):
     # save the best parameters to a file in appropriate results dir
@@ -202,17 +207,17 @@ def make_parameter_grid(model_name):
         return {'sgdregressor__alpha': [1e-05, 0.0001, 0.001, 0.01, 0.1],
                 'sgdregressor__loss': ['squared_error','huber','epsilon_insensitive','squared_epsilon_insensitive'],
                 'sgdregressor__penalty': ['elasticnet'],
-                'sgdregressor__l1_ratio': [0, 0.2, 0.4, 0.6, 0.8, 1]}
+                'sgdregressor__l1_ratio': [0, 0.05, 0.15, 0.2, 0.4, 0.6, 0.8, 1]}
     elif model_name.lower() == 'decisiontreeregressor':
         return {'decisiontreeregressor__max_depth': [2, 4, 6, 8, 10],
                 'decisiontreeregressor__min_samples_split': [2, 4, 6, 8, 10],
                 'decisiontreeregressor__min_samples_leaf': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
                 'decisiontreeregressor__min_impurity_decrease': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]}
     elif model_name.lower() == 'randomforestregressor':
-        return {'randomforestregressor__n_estimators': [10, 100, 350, 500, 1000],
-                'randomforestregressor__max_depth': [2, 4, 6, 8, 10],
-                'randomforestregressor__min_samples_split': [2, 4, 6, 8, 10],
-                'randomforestregressor__min_samples_leaf': [1, 3, 5, 7, 9],
+        return {'randomforestregressor__n_estimators': [10, 50, 100, 200, 350, 500, 1000],
+                'randomforestregressor__max_depth': [None, 2, 4, 6, 8, 10],
+                'randomforestregressor__min_samples_split': [2, 6, 10],
+                'randomforestregressor__min_samples_leaf': [1, 6, 9],
                 'randomforestregressor__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower == 'gradientboostingregressor':
         return {'gradientboostingregressor__n_estimators': [10, 100, 350, 500, 1000],
@@ -222,15 +227,15 @@ def make_parameter_grid(model_name):
                 'gradientboostingregressor__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower() == 'xgbrregressor':
         return {'xgbrregressor__n_estimators': [10, 100, 350, 500, 1000],
-                'xgbrregressor__max_depth': [2, 4, 6, 8, 10],
-                'xgbrregressor__min_samples_split': [2, 4, 6, 8, 10],
-                'xgbrregressor__min_samples_leaf': [1, 3, 5, 7, 9],
+                'xgbrregressor__max_depth': [2, 6, 10],
+                'xgbrregressor__min_samples_split': [2, 6, 10],
+                'xgbrregressor__min_samples_leaf': [1, 6, 9],
                 'xgbrregressor__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower() == 'gradientboostingregressor':
-        return {'gradientboostingregressor__n_estimators': [10, 100, 350, 500, 1000],
-                'gradientboostingregressor__max_depth': [2, 4, 6, 8, 10],
-                'gradientboostingregressor__min_samples_split': [2, 4, 6, 8, 10],
-                'gradientboostingregressor__min_samples_leaf': [1, 3, 5, 7, 9],
+        return {'gradientboostingregressor__n_estimators': [10, 50, 100, 200, 350, 500, 1000],
+                'gradientboostingregressor__max_depth': [2, 3, 4, 6, 8, 10],
+                'gradientboostingregressor__min_samples_split': [2, 6, 10],
+                'gradientboostingregressor__min_samples_leaf': [1, 6, 9],
                 'gradientboostingregressor__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower() == 'svr':
         return {'svr__C': np.logspace(-4, 2, 10),
@@ -267,56 +272,56 @@ def make_parameter_grid(model_name):
                 'decisiontreeclassifier__min_samples_leaf': [1, 3, 5, 7, 9],
                 'decisiontreeclassifier__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower() == 'randomforestclassifier':
-        return {'randomforestclassifier__n_estimators': [10, 100, 350, 500, 1000],
-                'randomforestclassifier__max_depth': [2, 4, 6, 8, 10],
-                'randomforestclassifier__min_samples_split': [2, 4, 6, 8, 10],
-                'randomforestclassifier__min_samples_leaf': [1, 3, 5, 7, 9],
+        return {'randomforestclassifier__n_estimators': [10, 50, 100, 200, 350, 500, 1000],
+                'randomforestclassifier__max_depth': [None, 2, 3, 4, 6, 8, 10],
+                'randomforestclassifier__min_samples_split': [2, 6, 10],
+                'randomforestclassifier__min_samples_leaf': [1, 5, 9],
                 'randomforestclassifier__min_impurity_decrease': [0.0, 0.25, 0.5]}
     elif model_name.lower() == 'gradientboostingclassifier':    
-        return {'gradientboostingclassifier__n_estimators': [10, 100, 350, 500, 1000],
+        return {'gradientboostingclassifier__n_estimators': [10, 50, 100, 200, 350, 500, 1000],
                 'gradientboostingclassifier__max_depth': [2, 3, 4, 6, 9],
-                'gradientboostingclassifier__min_samples_split': [2, 4, 6, 8, 10],
-                'gradientboostingclassifier__min_samples_leaf': [1, 3, 5, 7, 9, 10],
+                'gradientboostingclassifier__min_samples_split': [2, 6, 10],
+                'gradientboostingclassifier__min_samples_leaf': [1, 6, 10],
                 'gradientboostingclassifier__min_impurity_decrease': [0.0, 0.25, 0.5]}
 
-def get_tabular_data(args, test_size=0.2, rstate=None, column_overide=None, one_hot_encode_labels=False):
-    '''
-    Load tabular data and split it into training and testing sets.
+# def get_tabular_data(args, test_size=0.3, rstate=None, column_overide=None, one_hot_encode_labels=False):
+#     '''
+#     Load tabular data and split it into training and testing sets.
     
-    Arguments:
-    args: a dictionary containing the file name, import path, label, random state and ml model
-    test_size: the proportion of the data to be used for testing
-    rstate: the random state
-    column_overide: the column to be used as the label. If None, Price_Night is the label
-    one_hot_encode_labels: whether to one hot encode the labels
+#     Arguments:
+#     args: a dictionary containing the file name, import path, label, random state and ml model
+#     test_size: the proportion of the data to be used for testing
+#     rstate: the random state
+#     column_overide: the column to be used as the label. If None, Price_Night is the label
+#     one_hot_encode_labels: whether to one hot encode the labels
     
-    Returns:
-    X_train: the training data
-    X_test: the testing data
-    y_train: the training labels
-    y_test: the testing labels
-    '''
-    if rstate is None:
-        rstate = args['random_state']
+#     Returns:
+#     X_train: the training data
+#     X_test: the testing data
+#     y_train: the training labels
+#     y_test: the testing labels
+#     '''
+#     if rstate is None:
+#         rstate = args['random_state']
 
-    column = args['label']
+#     column = args['label']
 
-    if column_overide is not None:
-        column = column_overide
+#     if column_overide is not None:
+#         column = column_overide
 
-    model_data = ModelData()
+#     model_data = ModelData()
 
-    df = model_data.load_tabular_data(args['file_name'], args['import_path'])
+#     df = model_data.load_tabular_data(args['file_name'], args['import_path'])
 
-    to_model = model_data.extract_label(df, column, numeric_only=True)
+#     to_model = model_data.extract_label(df, column, numeric_only=True)
 
-    X_train, X_test, y_train, y_test = train_test_split(to_model[0], to_model[1], test_size=test_size, random_state=rstate)
+#     X_train, X_test, y_train, y_test = train_test_split(to_model[0], to_model[1], test_size=test_size, random_state=rstate)
 
-    if one_hot_encode_labels:
-        y_train = one_hot_encode_column(y_train)
-        y_test = one_hot_encode_column(y_test)
+#     if one_hot_encode_labels:
+#         y_train = one_hot_encode_column(y_train)
+#         y_test = one_hot_encode_column(y_test)
 
-    return X_train, X_test, y_train, y_test
+#     return X_train, X_test, y_train, y_test
 
 def tune_one_regression_model(args, X_train, y_train):
     '''
@@ -458,24 +463,24 @@ def evaluate_one_classification_model(args, X_test=None, y_test=None, column_ove
 
     return tuned_accuracy
 
-def one_hot_encode_column(pds):
-    '''
-    One hot encode a pandas series.
+#def one_hot_encode_column(pds):
+#    '''
+#    One hot encode a pandas series.
 
-    Arguments:
-    pds: a pandas series to encode
+#   Arguments:
+#    pds: a pandas series to encode
 
-    Returns:
-    oh_labels: the one hot encoded labels as integers
-    '''
-    #oh_encoder = OneHotEncoder(sparse_output=False, drop='first')
-    oh_encoder = OneHotEncoder(sparse_output=False)
-    label_encoder = LabelEncoder()
-    pds_2 = label_encoder.fit_transform(pds).reshape(-1,1)
-    oh_encoder.fit(pds_2)
-    oh_labels = oh_encoder.transform(pds_2)
-    return np.argmax(oh_labels, axis=1)
-    #return oh_labels
+#    Returns:
+#    oh_labels: the one hot encoded labels as integers
+#    '''
+#    #oh_encoder = OneHotEncoder(sparse_output=False, drop='first')
+#    oh_encoder = OneHotEncoder(sparse_output=False)
+#    label_encoder = LabelEncoder()
+#    pds_2 = label_encoder.fit_transform(pds).reshape(-1,1)
+#    oh_encoder.fit(pds_2)
+#    oh_labels = oh_encoder.transform(pds_2)
+#    return np.argmax(oh_labels, axis=1)
+#    #return oh_labels
 
 def train_regression_model(arguments):
         # gets train data and calls tuning for regression
@@ -510,7 +515,7 @@ def do_training(arguments):
         elif get_model_type(model) == 'classification':
             train_classification_model(arguments)
         elif get_model_type(model) == 'neural_network':
-            train_and_evaluate_nn_model(arguments)
+            train_and_evaluate_nn(arguments)
 
 def do_evaluation(arguments):
     # evaluates models based on the arguments and model type
